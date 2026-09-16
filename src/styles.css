@@ -1,0 +1,48 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #07080c;
+  --color-surface: #101218;
+  --color-fg: #e8eef5;
+  --color-muted: #8b93a0;
+  --color-accent: #7ee0d6;
+  --color-danger: #e85d4c;
+  --color-border: color-mix(in oklab, var(--color-fg) 12%, transparent);
+  --font-sans: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+}
+
+@layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
