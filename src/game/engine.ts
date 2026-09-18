@@ -1,7 +1,7 @@
 import { NexusAudio } from "./audio";
 import { loadSave, writeSave, type SaveData } from "./save";
 
-export type GameMode = "attract" | "playing" | "dead";
+export type GameMode = "attract" | "playing" | "dead" | "won";
 
 export type Palette = {
   bg: string;
@@ -59,17 +59,22 @@ export type HudState = {
   muted: boolean;
   reduceShake: boolean;
   stageFlash: number;
+  sectors: number;
+  cleared: boolean;
 };
 
 const SIDES = 6;
 const SIDE_ANGLE = (Math.PI * 2) / SIDES;
 const PLAYER_R = 92;
 const CORE_R = 40;
-const SPAWN_R = 540;
-const WALL_THICK = 16;
-const PLAYER_HALF = 0.11; // radians of hitbox
+const SPAWN_R = 460;
+const WALL_THICK = 18;
+const FORGIVE = 0.28;
 const FIXED = 1 / 120;
-const GRAZE_WINDOW = 0.2;
+const GRAZE_WINDOW = 0.34;
+const SECTORS = 5;
+const SECTOR_LEN = 8;
+const WIN_AT = SECTORS * SECTOR_LEN;
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -98,66 +103,94 @@ function threeAlt(g: number): number {
   return oneGap(g) & oneGap(g + 2) & oneGap(g + 4);
 }
 
+function twoWalls(g: number): number {
+  const a = ((g % 6) + 6) % 6;
+  return (1 << a) | (1 << ((a + 3) % 6));
+}
+
 type Step = { mask: number; beats: number };
 
 function pickPattern(stage: number, rng: () => number): Step[] {
   const g = Math.floor(rng() * 6);
-  const pool: Step[][] = [
-    [
-      { mask: oneGap(g), beats: 1.1 },
-      { mask: oneGap(g + 1), beats: 1.1 },
-      { mask: oneGap(g + 2), beats: 1.2 },
-    ],
-    [
-      { mask: twoOpp(g), beats: 0.9 },
-      { mask: twoOpp(g + 1), beats: 0.9 },
-      { mask: twoOpp(g), beats: 1.0 },
-    ],
-    [
-      { mask: oneGap(g), beats: 0.85 },
-      { mask: oneGap(g), beats: 0.85 },
-      { mask: oneGap(g + 1), beats: 1.1 },
-    ],
-    [
-      { mask: twoAdj(g), beats: 1.0 },
-      { mask: twoAdj(g + 1), beats: 1.05 },
-    ],
-    [
-      { mask: threeAlt(g), beats: 0.8 },
-      { mask: threeAlt(g + 1), beats: 0.85 },
-    ],
-  ];
-
-  if (stage >= 2) {
-    pool.push([
-      { mask: oneGap(g), beats: 0.7 },
-      { mask: oneGap(g + 1), beats: 0.7 },
-      { mask: oneGap(g + 2), beats: 0.7 },
-      { mask: oneGap(g + 3), beats: 0.9 },
-    ]);
+  if (stage <= 0) {
+    return [
+      [
+        { mask: twoWalls(g), beats: 2.4 },
+        { mask: twoWalls(g), beats: 2.4 },
+      ],
+      [
+        { mask: twoWalls(g), beats: 2.2 },
+        { mask: twoWalls(g + 1), beats: 2.4 },
+      ],
+      [
+        { mask: threeAlt(g), beats: 2.2 },
+        { mask: threeAlt(g), beats: 2.2 },
+      ],
+    ][Math.floor(rng() * 3)]!;
   }
-  if (stage >= 3) {
-    pool.push([
-      { mask: twoOpp(g), beats: 0.65 },
-      { mask: twoOpp(g), beats: 0.65 },
-      { mask: twoOpp(g + 1), beats: 0.9 },
-    ]);
-    pool.push([
-      { mask: oneGap(g), beats: 0.6 },
-      { mask: oneGap(g + 2), beats: 0.95 },
-    ]);
+  if (stage === 1) {
+    return [
+      [
+        { mask: threeAlt(g), beats: 2.0 },
+        { mask: threeAlt(g + 1), beats: 2.1 },
+      ],
+      [
+        { mask: twoOpp(g), beats: 2.0 },
+        { mask: twoOpp(g), beats: 2.0 },
+      ],
+      [
+        { mask: twoAdj(g), beats: 2.0 },
+        { mask: twoAdj(g), beats: 2.1 },
+      ],
+    ][Math.floor(rng() * 3)]!;
   }
-  if (stage >= 4) {
-    pool.push([
-      { mask: oneGap(g), beats: 0.55 },
-      { mask: oneGap(g + 1), beats: 0.55 },
-      { mask: oneGap(g + 2), beats: 0.55 },
-      { mask: oneGap(g + 3), beats: 0.55 },
-      { mask: oneGap(g + 4), beats: 0.8 },
-    ]);
+  if (stage === 2) {
+    return [
+      [
+        { mask: twoOpp(g), beats: 1.7 },
+        { mask: twoOpp(g + 1), beats: 1.8 },
+      ],
+      [
+        { mask: twoAdj(g), beats: 1.7 },
+        { mask: twoAdj(g + 1), beats: 1.8 },
+      ],
+      [
+        { mask: threeAlt(g), beats: 1.6 },
+        { mask: threeAlt(g + 1), beats: 1.7 },
+      ],
+    ][Math.floor(rng() * 3)]!;
   }
-
-  return pool[Math.floor(rng() * pool.length)] ?? pool[0]!;
+  if (stage === 3) {
+    return [
+      [
+        { mask: twoOpp(g), beats: 1.5 },
+        { mask: twoOpp(g + 1), beats: 1.55 },
+      ],
+      [
+        { mask: twoAdj(g), beats: 1.5 },
+        { mask: twoAdj(g + 1), beats: 1.6 },
+      ],
+      [
+        { mask: oneGap(g), beats: 1.8 },
+        { mask: oneGap(g), beats: 1.8 },
+      ],
+    ][Math.floor(rng() * 3)]!;
+  }
+  return [
+    [
+      { mask: oneGap(g), beats: 1.55 },
+      { mask: oneGap(g), beats: 1.55 },
+      { mask: oneGap(g + 1), beats: 1.7 },
+    ],
+    [
+      { mask: twoOpp(g), beats: 1.35 },
+      { mask: twoOpp(g + 1), beats: 1.4 },
+    ],
+    [
+      { mask: twoAdj(g), beats: 1.4 },
+      { mask: twoAdj(g + 1), beats: 1.5 },
+    ],
+  ][Math.floor(rng() * 3)]!;
 }
 
 function sideAt(angle: number, rot: number): number {
@@ -209,6 +242,7 @@ export class NexusEngine {
   paletteIndex = 0;
   reduceShake = false;
   muted = false;
+  private reverseBoost = 0;
 
   readonly playerR = PLAYER_R;
   readonly coreR = CORE_R;
@@ -254,6 +288,8 @@ export class NexusEngine {
       muted: this.muted,
       reduceShake: this.reduceShake,
       stageFlash: this.stageFlash,
+      sectors: SECTORS,
+      cleared: this.save.cleared,
     };
   }
 
@@ -312,18 +348,19 @@ export class NexusEngine {
     this.beatPhase = 0;
     this.trauma = 0;
     this.hitstop = 0;
-    this.flash = 0.35;
-    this.stageFlash = 0.8;
+    this.flash = 0.2;
+    this.stageFlash = 0.55;
     this.deathAge = 0;
     this.newBest = false;
     this.worldSpin = 0;
     this.paletteIndex = 0;
     this.acc = 0;
+    this.reverseBoost = 0;
     this.rng = mulberry32((Math.random() * 0xffffffff) | 0);
-    this.nextSpawn = 0.55;
+    this.nextSpawn = 1.15;
     this.spawnQueue = [];
     this.beatClock = 0;
-    this.bpm = 128;
+    this.bpm = 104;
     this.lastBeat = 0;
     this.save.games += 1;
     writeSave(this.save);
@@ -357,8 +394,8 @@ export class NexusEngine {
   }
 
   reverse(): void {
-    if (this.mode === "dead") {
-      if (this.deathAge > 0.28) this.startRun();
+    if (this.mode === "dead" || this.mode === "won") {
+      if (this.deathAge > 0.18) this.startRun();
       return;
     }
     if (this.mode === "attract") {
@@ -366,24 +403,29 @@ export class NexusEngine {
       return;
     }
     this.dir = this.dir === 1 ? -1 : 1;
-    this.flash = Math.max(this.flash, 0.12);
-    this.addTrauma(0.18);
-    this.burst(PLAYER_R, this.angle, 8, this.palette.player, 90);
+    this.reverseBoost = 0.16;
+    this.flash = Math.max(this.flash, 0.08);
+    this.addTrauma(0.1);
+    this.burst(PLAYER_R, this.angle, 6, this.palette.player, 110);
     this.audio.reverse();
   }
 
   setDir(dir: 1 | -1): void {
+    if (this.mode === "dead" || this.mode === "won") {
+      if (this.deathAge > 0.18) this.startRun();
+      return;
+    }
     if (this.mode === "attract") {
       this.startRun();
       this.dir = dir;
       return;
     }
-    if (this.mode !== "playing") return;
     if (this.dir === dir) return;
     this.dir = dir;
-    this.flash = Math.max(this.flash, 0.1);
-    this.addTrauma(0.14);
-    this.burst(PLAYER_R, this.angle, 6, this.palette.player, 70);
+    this.reverseBoost = 0.16;
+    this.flash = Math.max(this.flash, 0.08);
+    this.addTrauma(0.08);
+    this.burst(PLAYER_R, this.angle, 5, this.palette.player, 90);
     this.audio.reverse();
   }
 
@@ -427,11 +469,12 @@ export class NexusEngine {
   }
 
   private playerSpeed(): number {
-    return 2.35 + Math.min(1.7, this.time * 0.028 + this.stage * 0.12);
+    const base = 5.1 + Math.min(0.9, this.stage * 0.12);
+    return base + (this.reverseBoost > 0 ? 3.6 : 0);
   }
 
   private wallSpeed(): number {
-    return 210 + Math.min(260, this.time * 4.2 + this.stage * 18);
+    return 88 + this.stage * 8;
   }
 
   tick(dt: number): void {
@@ -451,7 +494,7 @@ export class NexusEngine {
   }
 
   private step(dt: number): void {
-    this.bpm = (this.mode === "attract" ? 118 : 128) + Math.min(52, this.time * 0.85);
+    this.bpm = (this.mode === "attract" ? 100 : 104) + Math.min(36, this.time * 0.45);
     const beatDur = 60 / this.bpm;
     this.beatClock += dt;
     this.beatPhase = (this.beatClock % beatDur) / beatDur;
@@ -464,7 +507,7 @@ export class NexusEngine {
     const pulseKick = this.beatPhase < 0.12 ? 1 - this.beatPhase / 0.12 : 0;
     this.pulse = 1 + pulseKick * 0.055;
 
-    if (this.mode === "dead") {
+    if (this.mode === "dead" || this.mode === "won") {
       this.deathAge += dt;
       this.angle += this.dir * 0.35 * dt;
       this.advanceWalls(dt, false);
@@ -472,6 +515,7 @@ export class NexusEngine {
     }
 
     this.time += dt;
+    if (this.reverseBoost > 0) this.reverseBoost = Math.max(0, this.reverseBoost - dt);
     this.angle += this.dir * this.playerSpeed() * dt;
     this.worldSpin += dt * (0.12 + this.stage * 0.02);
     this.trail.push(this.angle);
@@ -480,21 +524,30 @@ export class NexusEngine {
     if (this.mode === "attract") this.attractSteer();
 
     if (this.mode === "playing") {
-      const nextStage = Math.floor(this.time / 12);
+      const nextStage = Math.min(SECTORS - 1, Math.floor(this.time / SECTOR_LEN));
       if (nextStage > this.stage) {
         this.stage = nextStage;
         this.paletteIndex = this.stage % PALETTES.length;
         this.stageFlash = 1;
-        this.flash = 0.4;
-        this.addTrauma(0.35);
+        this.flash = 0.35;
+        this.addTrauma(0.28);
         this.audio.stageUp();
         this.notifyHud();
       }
       this.score = Math.floor(this.time * 100) + this.combo * 25;
       this.audio.setTension(this.stage, this.time);
+
+      if (this.time >= WIN_AT) {
+        this.spawnQueue = [];
+        if (this.walls.length === 0) {
+          this.win();
+          return;
+        }
+      }
     }
 
-    this.spawnWalls();
+    if (this.mode === "playing" && this.time < WIN_AT) this.spawnWalls();
+    else if (this.mode === "attract") this.spawnWalls();
     this.advanceWalls(dt, this.mode === "playing");
 
     this.hudAcc += dt;
@@ -572,23 +625,18 @@ export class NexusEngine {
 
   private onCross(wall: Wall): void {
     const a = this.angle;
-    const samples = [-PLAYER_HALF, 0, PLAYER_HALF];
-    let hit = false;
-    for (const off of samples) {
-      const side = sideAt(a + off, wall.rot);
-      if ((wall.mask & (1 << side)) !== 0) {
-        hit = true;
-        break;
-      }
-    }
-    if (hit) {
+    const side = sideAt(a, wall.rot);
+    const inSolid = (wall.mask & (1 << side)) !== 0;
+    const edge = distToGapEdge(a, wall.rot, wall.mask);
+    const grazed = edge < GRAZE_WINDOW;
+
+    if (inSolid && edge > FORGIVE) {
       this.die();
       return;
     }
 
     this.audio.pass();
-    const edge = distToGapEdge(a, wall.rot, wall.mask);
-    if (edge < GRAZE_WINDOW && !wall.grazed) {
+    if ((grazed || (inSolid && edge <= FORGIVE)) && !wall.grazed) {
       wall.grazed = true;
       this.combo += 1;
       this.score += 50 + this.combo * 10;
@@ -622,6 +670,30 @@ export class NexusEngine {
     }
     if (s > this.save.bestScore) {
       this.save.bestScore = s;
+      this.newBest = true;
+    }
+    writeSave(this.save);
+    this.notifyHud();
+  }
+
+  win(): void {
+    if (this.mode !== "playing") return;
+    this.mode = "won";
+    this.deathAge = 0;
+    this.stage = SECTORS - 1;
+    this.flash = 0.55;
+    this.stageFlash = 1;
+    this.addTrauma(0.4);
+    this.burst(PLAYER_R, this.angle, 36, this.palette.ink, 180);
+    this.audio.win();
+    this.score += 1500;
+    this.save.cleared = true;
+    if (this.time > this.save.bestTime) {
+      this.save.bestTime = this.time;
+      this.newBest = true;
+    }
+    if (this.score > this.save.bestScore) {
+      this.save.bestScore = this.score;
       this.newBest = true;
     }
     writeSave(this.save);

@@ -183,6 +183,29 @@ export class NexusAudio {
     }
   }
 
+  win(): void {
+    if (!this.ctx || !this.sfx) return;
+    const t = this.ctx.currentTime;
+    const notes = [330, 415, 494, 660];
+    for (let i = 0; i < notes.length; i++) {
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = notes[i]!;
+      const start = t + i * 0.11;
+      g.gain.setValueAtTime(0.1, start);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.32);
+      osc.connect(g);
+      g.connect(this.sfx);
+      osc.start(start);
+      osc.stop(start + 0.34);
+      osc.onended = () => {
+        osc.disconnect();
+        g.disconnect();
+      };
+    }
+  }
+
   death(): void {
     if (!this.ctx || !this.sfx) return;
     const t = this.ctx.currentTime;

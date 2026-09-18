@@ -1,15 +1,15 @@
-# NEXUS
+# ZENDALT
 
-One tap. Reverse orbit. Survive.
+One tap. Reverse orbit. Clear five sectors.
 
-A hexagonal survival arcade game — tap to reverse, slip through collapsing walls, chain grazes for multipliers. High scores stay on your device.
+A hexagonal arcade game — tap to reverse, slip through collapsing walls, chain grazes. Survive five sectors to finish. High scores stay on your device.
 
 ## Play
 
 - **Tap / click / space** — reverse direction
 - **A / Left** and **D / Right** — set direction
 - Near-miss a wall edge for a **GRAZE** combo
-- Stages shift every 12 seconds; speed and patterns escalate
+- Five sectors, then **Cleared**
 
 ## Deploy on Vercel
 

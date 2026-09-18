@@ -1,4 +1,4 @@
-const KEY = "nexus-save-v1";
+const KEY = "zendalt-save-v1";
 const SAVE_VERSION = 1;
 
 export type SaveData = {
@@ -8,6 +8,7 @@ export type SaveData = {
   games: number;
   muted: boolean;
   reduceShake: boolean;
+  cleared: boolean;
 };
 
 const defaults: SaveData = {
@@ -17,6 +18,7 @@ const defaults: SaveData = {
   games: 0,
   muted: false,
   reduceShake: false,
+  cleared: false,
 };
 
 function migrate(raw: Partial<SaveData> | null): SaveData {

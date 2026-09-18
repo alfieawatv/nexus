@@ -49,7 +49,7 @@ export function renderFrame(
   ctx.fillStyle = pal.bg;
   ctx.fillRect(0, 0, w, h);
 
-  const viewR = 255;
+  const viewR = 390;
   const scale = (Math.min(w, h) * 0.5) / viewR;
   const trauma = reducedMotion || engine.reduceShake ? engine.trauma * 0.2 : engine.trauma;
   const shake = trauma * trauma;

@@ -3,7 +3,7 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "NEXUS";
+const APP_NAME = "ZENDALT";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -11,7 +11,7 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: APP_NAME },
-      { name: "description", content: "One tap. Reverse orbit. Don't die. An endless hexagonal survival game." },
+      { name: "description", content: "One tap. Reverse orbit. Clear five sectors. A hexagonal arcade game." },
       { name: "theme-color", content: "#07080c" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
     ],

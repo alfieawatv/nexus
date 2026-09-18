@@ -5,11 +5,12 @@ import { renderFrame } from "@/game/renderer";
 
 declare global {
   interface Window {
-    __nexus?: {
+    __zendalt?: {
       mode: () => string;
       time: () => number;
       start: () => void;
       reverse: () => void;
+      win: () => void;
     };
   }
 }
@@ -70,6 +71,7 @@ export function NexusGame() {
     raf = requestAnimationFrame(loop);
 
     const onPointer = (e: PointerEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.("button")) return;
       e.preventDefault();
       engine.unlockAudio();
       engine.reverse();
@@ -91,23 +93,24 @@ export function NexusGame() {
       if (document.visibilityState === "visible") engine.resumeAudio();
     };
 
-    wrap.addEventListener("pointerdown", onPointer);
+    wrap.addEventListener("pointerdown", onPointer, { capture: true });
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVis);
 
-    window.__nexus = {
+    window.__zendalt = {
       mode: () => engine.mode,
       time: () => engine.time,
       start: () => engine.startRun(),
       reverse: () => engine.reverse(),
+      win: () => engine.win(),
     };
 
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
-      wrap.removeEventListener("pointerdown", onPointer);
+      wrap.removeEventListener("pointerdown", onPointer, true);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
@@ -115,13 +118,14 @@ export function NexusGame() {
       engine.destroy();
       engineRef.current = null;
       unsubHud();
-      delete window.__nexus;
+      delete window.__zendalt;
     };
   }, [ready, reducedMotion]);
 
   const playing = hud.mode === "playing";
   const dead = hud.mode === "dead";
   const attract = hud.mode === "attract";
+  const won = hud.mode === "won";
 
   return (
     <div
@@ -135,11 +139,16 @@ export function NexusGame() {
         <header className="flex items-start justify-between px-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
           <div className="min-w-0">
             {playing ? (
-              <p className="font-sans text-3xl font-semibold tabular-nums tracking-tight text-fg sm:text-4xl">
-                {formatTime(hud.time)}
-              </p>
+              <>
+                <p className="font-sans text-3xl font-semibold tabular-nums tracking-tight text-fg sm:text-4xl">
+                  {formatTime(hud.time)}
+                </p>
+                <p className="mt-1 text-xs font-medium tracking-[0.18em] text-muted uppercase">
+                  Sector {hud.stage + 1} / {hud.sectors}
+                </p>
+              </>
             ) : (
-              <p className="text-xs font-medium tracking-[0.28em] text-muted uppercase">Nexus</p>
+              <p className="text-xs font-medium tracking-[0.28em] text-muted uppercase">Zendalt</p>
             )}
             {playing && hud.combo > 1 ? (
               <p className="mt-1 text-xs font-medium tracking-[0.18em] text-accent uppercase">
@@ -167,17 +176,19 @@ export function NexusGame() {
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
           {attract ? (
             <div className="max-w-sm">
-              <h1 className="text-[clamp(3.5rem,16vw,7rem)] leading-none font-semibold tracking-[-0.06em] text-fg">
-                NEXUS
+              <h1 className="text-[clamp(3rem,14vw,6.5rem)] leading-none font-semibold tracking-[-0.06em] text-fg">
+                ZENDALT
               </h1>
-              <p className="mt-4 text-sm tracking-[0.22em] text-muted uppercase">One tap. Reverse. Survive.</p>
+              <p className="mt-4 text-sm tracking-[0.22em] text-muted uppercase">Five sectors. Reverse. Clear it.</p>
               <p className="mt-8 text-sm font-medium tracking-[0.28em] text-fg uppercase">Tap to play</p>
-              {hud.bestTime > 0 ? (
+              {hud.cleared ? (
+                <p className="mt-6 text-xs tracking-[0.18em] text-accent uppercase">Cleared · Best {formatTime(hud.bestTime)}s</p>
+              ) : hud.bestTime > 0 ? (
                 <p className="mt-6 text-xs tracking-[0.18em] text-muted uppercase">
                   Best {formatTime(hud.bestTime)}s
                 </p>
               ) : (
-                <p className="mt-6 text-xs tracking-[0.18em] text-muted uppercase">A / D or tap to reverse</p>
+                <p className="mt-6 text-xs tracking-[0.18em] text-muted uppercase">Tap or A / D to reverse</p>
               )}
             </div>
           ) : null}
@@ -198,8 +209,23 @@ export function NexusGame() {
             </div>
           ) : null}
 
+          {won ? (
+            <div className="max-w-sm">
+              <p className="text-xs font-medium tracking-[0.28em] text-accent uppercase">Cleared</p>
+              <h2 className="mt-3 text-[clamp(2.5rem,12vw,4.5rem)] leading-none font-semibold tracking-[-0.05em] text-fg">
+                ZENDALT
+              </h2>
+              <p className="mt-4 text-sm text-muted">
+                {formatTime(hud.time)}s · Score {hud.score}
+              </p>
+              <p className="mt-8 text-sm font-medium tracking-[0.28em] text-fg uppercase">Tap to play again</p>
+            </div>
+          ) : null}
+
           {playing && hud.stageFlash > 0.15 ? (
-            <p className="text-sm font-medium tracking-[0.32em] text-fg uppercase">Stage {hud.stage + 1}</p>
+            <p className="text-sm font-medium tracking-[0.32em] text-fg uppercase">
+              {hud.stage + 1 >= hud.sectors ? "Final sector" : `Sector ${hud.stage + 1} / ${hud.sectors}`}
+            </p>
           ) : null}
         </div>
 
@@ -208,7 +234,7 @@ export function NexusGame() {
             <p className="text-[11px] tracking-[0.2em] text-muted uppercase">Tap · Space · A / D</p>
           ) : (
             <p className="text-[11px] tracking-[0.18em] text-muted uppercase">
-              {hud.games > 0 ? `${hud.games} runs` : "Don't blink"}
+              {hud.cleared ? "Cleared" : hud.games > 0 ? `${hud.games} runs` : "Five sectors"}
             </p>
           )}
         </footer>
@@ -230,6 +256,8 @@ const EMPTY_HUD: HudState = {
   muted: false,
   reduceShake: false,
   stageFlash: 0,
+  sectors: 5,
+  cleared: false,
 };
 
 function useReducedMotion(): boolean {
