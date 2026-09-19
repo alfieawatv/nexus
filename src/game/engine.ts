@@ -73,7 +73,7 @@ const FORGIVE = 0.28;
 const FIXED = 1 / 120;
 const GRAZE_WINDOW = 0.34;
 const SECTORS = 5;
-const SECTOR_LEN = 8;
+const SECTOR_LEN = 6;
 const WIN_AT = SECTORS * SECTOR_LEN;
 
 function mulberry32(seed: number): () => number {
@@ -360,7 +360,7 @@ export class NexusEngine {
     this.nextSpawn = 1.15;
     this.spawnQueue = [];
     this.beatClock = 0;
-    this.bpm = 104;
+    this.bpm = 100;
     this.lastBeat = 0;
     this.save.games += 1;
     writeSave(this.save);
@@ -388,7 +388,7 @@ export class NexusEngine {
     this.rng = mulberry32(7);
     this.nextSpawn = 0.3;
     this.spawnQueue = [];
-    this.bpm = 118;
+    this.bpm = 110;
     this.acc = 0;
     this.notifyHud();
   }
@@ -403,7 +403,7 @@ export class NexusEngine {
       return;
     }
     this.dir = this.dir === 1 ? -1 : 1;
-    this.reverseBoost = 0.16;
+    this.reverseBoost = 0.14;
     this.flash = Math.max(this.flash, 0.08);
     this.addTrauma(0.1);
     this.burst(PLAYER_R, this.angle, 6, this.palette.player, 110);
@@ -422,7 +422,7 @@ export class NexusEngine {
     }
     if (this.dir === dir) return;
     this.dir = dir;
-    this.reverseBoost = 0.16;
+    this.reverseBoost = 0.14;
     this.flash = Math.max(this.flash, 0.08);
     this.addTrauma(0.08);
     this.burst(PLAYER_R, this.angle, 5, this.palette.player, 90);
@@ -469,12 +469,13 @@ export class NexusEngine {
   }
 
   private playerSpeed(): number {
-    const base = 5.1 + Math.min(0.9, this.stage * 0.12);
-    return base + (this.reverseBoost > 0 ? 3.6 : 0);
+    // Calm orbit; reverse still snaps hard
+    const base = 2.85 + Math.min(0.55, this.stage * 0.08);
+    return base + (this.reverseBoost > 0 ? 4.2 : 0);
   }
 
   private wallSpeed(): number {
-    return 88 + this.stage * 8;
+    return 72 + this.stage * 6;
   }
 
   tick(dt: number): void {
@@ -494,7 +495,7 @@ export class NexusEngine {
   }
 
   private step(dt: number): void {
-    this.bpm = (this.mode === "attract" ? 100 : 104) + Math.min(36, this.time * 0.45);
+    this.bpm = (this.mode === "attract" ? 96 : 98) + Math.min(28, this.time * 0.4);
     const beatDur = 60 / this.bpm;
     this.beatClock += dt;
     this.beatPhase = (this.beatClock % beatDur) / beatDur;
@@ -517,7 +518,7 @@ export class NexusEngine {
     this.time += dt;
     if (this.reverseBoost > 0) this.reverseBoost = Math.max(0, this.reverseBoost - dt);
     this.angle += this.dir * this.playerSpeed() * dt;
-    this.worldSpin += dt * (0.12 + this.stage * 0.02);
+    this.worldSpin += dt * (0.06 + this.stage * 0.01);
     this.trail.push(this.angle);
     if (this.trail.length > 10) this.trail.shift();
 
